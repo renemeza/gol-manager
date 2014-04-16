@@ -1,30 +1,36 @@
 var express = require('express'),
-    path = require('path'),
-    favicon = require('static-favicon'),
-    logger = require('morgan'),
-    cookieParser = require('cookie-parser'),
-    bodyParser = require('body-parser'),
-    session = require('express-session');
-
-var routes = require('./routes/index');
-var users = require('./routes/users');
+    fs = require('fs'),
+    mongoose = require('mongoose'),
+    env = process.env.NODE_ENV || 'development',
+    config = require('./config/config')[env];
 
 var app = express();
 
-// view engine setup
-app.set('views', path.join(__dirname, 'views'));
-app.set('view engine', 'jade');
+var db_connect = function () {
+    var options = { server: {socketOptions: { keepAlive: 1 } } };
+    mongoose.connect(config.db.connection, options);
+};
 
-app.use(favicon());
-app.use(logger('dev'));
-app.use(bodyParser.json());
-app.use(bodyParser.urlencoded());
-app.use(cookieParser());
-app.use(express.static(path.join(__dirname, 'public')));
-app.use(session({ secret: 'gatitos jugando', key: 'sid', cookie: { secure: true }}));
+db_connect();
 
-app.use('/', routes);
-app.use('/users', users);
+mongoose.connection.on('error', function (err) {
+    console.log(err);
+});
+
+mongoose.connection.on('close', function () {
+    db_connect();
+});
+
+fs.readdirSync(config.paths.models).forEach(function (file) {
+    if (file.indexOf('.js') != -1 ){
+        require(config.paths.models + '/' + file);
+    }
+});
+
+require('./config/express.js') (app);
+
+require('./config/routes.js') (app);
+
 
 /// catch 404 and forwarding to error handler
 app.use(function(req, res, next) {
